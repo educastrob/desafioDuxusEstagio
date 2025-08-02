@@ -1,4 +1,10 @@
-package br.com.duxusdesafio;
+package br.com.duxusdesafio.repository;
 
-public interface ComposicaoTimeRepository {
-}
+import br.com.duxusdesafio.model.ComposicaoTime;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ComposicaoTimeRepository extends JpaRepository<ComposicaoTime, Long> {
+    // Métodos customizados podem ser adicionados aqui se necessário
+} 
