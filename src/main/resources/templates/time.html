@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montagem de Times</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .transfer-container {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .select-container {
+            flex: 1;
+        }
+        .transfer-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .selected-item {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">🏆 Sistema de Escalação</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/integrante">Cadastrar Integrantes</a>
+                <a class="nav-link active" href="/time">Montar Times</a>
+                <a class="nav-link" href="/analises">Análises</a>
+                <a class="nav-link" href="/api/times" target="_blank">API</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-plus-circle"></i> Montar Novo Time</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="timeForm">
+                            <div class="mb-3">
+                                <label for="data" class="form-label">Data do Time *</label>
+                                <input type="date" class="form-control" id="data" name="data" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Selecionar Integrantes</label>
+                                <div class="transfer-container">
+                                    <div class="select-container">
+                                        <label class="form-label">Integrantes Disponíveis</label>
+                                        <select id="disponiveis" class="form-select" size="8" multiple>
+                                        </select>
+                                    </div>
+                                    <div class="transfer-buttons">
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="adicionarIntegrantes()">
+                                            <i class="fas fa-arrow-right"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="removerIntegrantes()">
+                                            <i class="fas fa-arrow-left"></i>
+                                        </button>
+                                    </div>
+                                    <div class="select-container">
+                                        <label class="form-label">Integrantes Selecionados</label>
+                                        <select id="selecionados" class="form-select" size="8" multiple>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-save"></i> Salvar Time
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-trophy"></i> Times Cadastrados</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="carregarTimes()">
+                            <i class="fas fa-sync-alt"></i> Atualizar
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="loading" class="text-center d-none">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                        </div>
+                        <div id="timesList">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let integrantesDisponiveis = [];
+        let integrantesSelecionados = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarIntegrantes();
+            carregarTimes();
+        });
+
+        document.getElementById('timeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            salvarTime();
+        });
+
+        function carregarIntegrantes() {
+            fetch('/api/integrantes')
+            .then(response => response.json())
+            .then(data => {
+                integrantesDisponiveis = data;
+                atualizarSelectDisponiveis();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar integrantes:', error);
+            });
+        }
+
+        function atualizarSelectDisponiveis() {
+            const select = document.getElementById('disponiveis');
+            select.innerHTML = '';
+            
+            integrantesDisponiveis.forEach(integrante => {
+                const option = document.createElement('option');
+                option.value = integrante.id;
+                option.textContent = `${integrante.nome} (${integrante.franquia} - ${integrante.funcao})`;
+                select.appendChild(option);
+            });
+        }
+
+        function adicionarIntegrantes() {
+            const select = document.getElementById('disponiveis');
+            const selecionados = Array.from(select.selectedOptions);
+            
+            selecionados.forEach(option => {
+                const integrante = integrantesDisponiveis.find(i => i.id == option.value);
+                if (integrante && !integrantesSelecionados.find(i => i.id == integrante.id)) {
+                    integrantesSelecionados.push(integrante);
+                }
+            });
+            
+            atualizarSelectSelecionados();
+            Array.from(select.options).forEach(option => option.selected = false);
+        }
+
+        function removerIntegrantes() {
+            const select = document.getElementById('selecionados');
+            const selecionados = Array.from(select.selectedOptions);
+            
+            selecionados.forEach(option => {
+                const index = integrantesSelecionados.findIndex(i => i.id == option.value);
+                if (index > -1) {
+                    integrantesSelecionados.splice(index, 1);
+                }
+            });
+            
+            atualizarSelectSelecionados();
+            Array.from(select.options).forEach(option => option.selected = false);
+        }
+
+        function atualizarSelectSelecionados() {
+            const select = document.getElementById('selecionados');
+            select.innerHTML = '';
+            
+            integrantesSelecionados.forEach(integrante => {
+                const option = document.createElement('option');
+                option.value = integrante.id;
+                option.textContent = `${integrante.nome} (${integrante.franquia} - ${integrante.funcao})`;
+                select.appendChild(option);
+            });
+        }
+
+        function salvarTime() {
+            const form = document.getElementById('timeForm');
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            
+            const data = document.getElementById('data').value;
+            const integrantesIds = integrantesSelecionados.map(i => i.id);
+            
+            if (integrantesIds.length === 0) {
+                alert('Selecione pelo menos um integrante!');
+                return;
+            }
+
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            submitButton.disabled = true;
+
+            const timeData = {
+                data: data,
+                integrantesIds: integrantesIds
+            };
+
+            fetch('/api/times', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(timeData)
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Time salvo com sucesso!');
+                    form.reset();
+                    integrantesSelecionados = [];
+                    atualizarSelectSelecionados();
+                    carregarTimes();
+                } else {
+                    return response.text().then(text => {
+                        throw new Error('Erro ao salvar time: ' + text);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao salvar time: ' + error.message);
+            })
+            .finally(() => {
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            });
+        }
+
+        function carregarTimes() {
+            const loading = document.getElementById('loading');
+            const list = document.getElementById('timesList');
+            
+            loading.classList.remove('d-none');
+            list.innerHTML = '';
+
+            fetch('/api/times')
+            .then(response => response.json())
+            .then(data => {
+                loading.classList.add('d-none');
+                if (data.length === 0) {
+                    list.innerHTML = '<p class="text-muted text-center">Nenhum time cadastrado</p>';
+                    return;
+                }
+
+                const timesHtml = data.map(time => {
+                    const integrantes = time.integrantesNomes && time.integrantesNomes.length > 0 
+                        ? time.integrantesNomes.join(', ') 
+                        : 'Nenhum integrante';
+                    return `
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Time #${time.id}</h6>
+                                <p class="card-text">
+                                    <strong>Data:</strong> ${time.data}<br>
+                                    <strong>Integrantes:</strong> ${integrantes}
+                                </p>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deletarTime(${time.id})">
+                                    <i class="fas fa-trash"></i> Deletar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                list.innerHTML = timesHtml;
+            })
+            .catch(error => {
+                loading.classList.add('d-none');
+                list.innerHTML = '<p class="text-danger text-center">Erro ao carregar times</p>';
+                console.error('Erro:', error);
+            });
+        }
+
+        function deletarTime(id) {
+            if (confirm('Tem certeza que deseja deletar este time?')) {
+                fetch(`/api/times/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Time deletado com sucesso!');
+                        carregarTimes();
+                    } else {
+                        alert('Erro ao deletar time');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao deletar time');
+                });
+            }
+        }
+    </script>
+</body>
+</html> 
